@@ -2,7 +2,6 @@ import gym
 import gym_cartpole_swingup
 import numpy as np
 import torch
-import dynamics_model
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 import os.path
@@ -39,11 +38,11 @@ def collect_dynamics_data(env, policy_model, eps=2, ep_len=400, state_dim=4, act
         print(i)
         obs = env.reset()
         for j in range(ep_len):
-            data[i,j,:state_dim] = obs
+            data[i,j,:state_dim] = env.state
             action = policy_model(obs)
             data[i,j,state_dim:(state_dim+action_dim)] = action
             obs, rewards, dones, info = env.step(action)
-            data[i,j,(state_dim+action_dim):] = obs
+            data[i,j,(state_dim+action_dim):] = env.state
             if(i%10==0):
                 env.render()
 
@@ -69,7 +68,7 @@ if __name__=='__main__':
     noisy_policy_model = NoisyPolicy(policy_model, 0.4)
 
     if(collect_data):
-        collect_dynamics_data(env=env, policy_model=noisy_policy_model, eps=400, ep_len=300, state_dim=5, action_dim=1, filename='data_T_15.npy')
+        collect_dynamics_data(env=env, policy_model=noisy_policy_model, eps=400, ep_len=300, state_dim=4, action_dim=1, filename='data_T_15.npy')
 
 
 
