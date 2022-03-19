@@ -3,6 +3,7 @@ import gym
 import numpy as np
 import torch
 import gym_cartpole_swingup
+import modified_gym_cartpole_swingup
 
 # Could be one of:
 # CartPoleSwingUp-v0, CartPoleSwingUp-v1
@@ -10,8 +11,7 @@ import gym_cartpole_swingup
 # TorchCartPoleSwingUp-v0, TorchCartPoleSwingUp-v1
 env = gym.make("TorchCartPoleSwingUp-v0")
 env.reset()
-env.state = torch.tensor([-0.5, 0, np.pi, 0], requires_grad=False)
-mpc_env = gym.make("TorchCartPoleSwingUp-v0")
+mpc_env = gym.make("ModifiedTorchCartPoleSwingUp-v0")
 
 T = 70
 actions = []
@@ -31,13 +31,12 @@ while not done:
 
     for i in range(10):
         optimizer.zero_grad()
-        reset_environment(mpc_env, env.state)
+        reset_environment(mpc_env, torch.as_tensor(env.state))
         rewards = 0
         for t in range(T):
             mpc_env.state, reward, done, _ = mpc_env.mpc_step(mpc_env.state, actions[t])
             rewards -= reward
         rewards.backward(retain_graph=True)
         optimizer.step()
-
-    env.state, rew, done, info = env.mpc_step(env.state, actions[0])
+    obs, rew, done, info = env.step(actions[0].detach().numpy())
     env.render()
