@@ -1,4 +1,5 @@
 # pylint:disable=missing-module-docstring,import-error
+import numpy as np
 import torch
 
 from .cartpole_swingup import CartPoleSwingUpEnv, State
@@ -70,8 +71,14 @@ class TorchCartPoleSwingUpEnv(CartPoleSwingUpEnv):
         new_costheta, new_sintheta = self._calculate_theta_update(state, delta_t)
         new_thetadot = state[..., 4] + thetadot_update * delta_t
 
+        scale = 0.05
+        error_x = np.random.rand() * scale
+        error_xdot = np.random.rand() * scale
+        error_costheta = np.random.rand() * scale
+        error_sintheta = np.random.rand() * scale
+        error_thetadot = np.random.rand() * scale
         next_state = torch.stack(
-            [new_x, new_xdot, new_costheta, new_sintheta, new_thetadot], dim=-1
+            [new_x + error_x, new_xdot + error_xdot, new_costheta + error_costheta, new_sintheta + error_sintheta, new_thetadot + error_thetadot], dim=-1
         )
         return next_state.expand(torch.Size(sample_shape) + state.shape), None
 
