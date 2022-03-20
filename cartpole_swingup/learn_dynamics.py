@@ -32,25 +32,28 @@ def learn_policy_model(env, timesteps, name):
 
 
 def collect_dynamics_data(env, policy_model, eps=2, ep_len=400, state_dim=4, action_dim=1, filename='data.npy'):
-    data = np.zeros((eps,ep_len,state_dim+action_dim+state_dim))
+    data = np.zeros((0, state_dim + action_dim + state_dim))
 
     for i in range(eps):
         print(i)
         obs = env.reset()
         for j in range(ep_len):
-            data[i,j,:state_dim] = env.state
+            data = np.vstack((data, np.zeros((1, state_dim + action_dim + state_dim))))
+            data[-1, :state_dim] = env.state
             action = policy_model(obs)
-            data[i,j,state_dim:(state_dim+action_dim)] = action
+            data[-1, state_dim:(state_dim+action_dim)] = action
             obs, rewards, dones, info = env.step(action)
-            data[i,j,(state_dim+action_dim):] = env.state
+            data[-1, (state_dim+action_dim):] = env.state
             if(i%10==0):
                 env.render()
+            if dones:
+                break
 
     if(os.path.exists('dynamics_data/'+filename)):
         data_prev = np.load('dynamics_data/'+filename, allow_pickle=True)
         data = np.vstack((data_prev,data))
 
-    np.save(filename, data)
+    np.save('dynamics_data/' + filename, data)
 
 if __name__=='__main__':
     env = gym.make("CartPoleSwingUp-v0")
@@ -65,10 +68,12 @@ if __name__=='__main__':
     else:
         policy_model = PPO.load('policy_models/mlp_1')
 
-    noisy_policy_model = NoisyPolicy(policy_model, 0.4)
 
-    if(collect_data):
-        collect_dynamics_data(env=env, policy_model=noisy_policy_model, eps=400, ep_len=300, state_dim=4, action_dim=1, filename='data_T_15.npy')
+    for noise in [0.0, 0.1, 0.2, 0.3, 0.4]:
+        print('Noise: ', noise)
+        noisy_policy_model = NoisyPolicy(policy_model, noise)
+        if(collect_data):
+            collect_dynamics_data(env=env, policy_model=noisy_policy_model, eps=100, ep_len=300, state_dim=4, action_dim=1, filename='data_T_15.npy')
 
 
 
