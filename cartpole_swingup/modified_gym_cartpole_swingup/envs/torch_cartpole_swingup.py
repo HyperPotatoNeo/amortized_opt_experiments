@@ -71,7 +71,7 @@ class TorchCartPoleSwingUpEnv(CartPoleSwingUpEnv):
         new_costheta, new_sintheta = self._calculate_theta_update(state, delta_t)
         new_thetadot = state[..., 4] + thetadot_update * delta_t
 
-        scale = 0.05
+        scale = 0.0
         error_x = np.random.rand() * scale
         error_xdot = np.random.rand() * scale
         error_costheta = np.random.rand() * scale
