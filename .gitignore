@@ -1,3 +1,4 @@
 *.npy
 *.zip
+MLP_Dagger_*
 __pycache__/
