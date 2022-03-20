@@ -1,5 +1,7 @@
 # amortized_opt_experiments
 
+Experiments with full and semi-amortized optimization for MPC.
+
 **TO-DO:**
 - Tune hyperparameters and try to get fully amortized opt model to work
 - Implement efficient way to get optimal action sequences to train fully amortized opt network with mean squared error
