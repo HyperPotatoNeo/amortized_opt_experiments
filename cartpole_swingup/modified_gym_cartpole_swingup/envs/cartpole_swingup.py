@@ -7,6 +7,7 @@ from collections import namedtuple
 
 import numpy as np
 import gym
+import torch
 from gym import spaces
 from gym.utils import seeding
 
@@ -80,6 +81,8 @@ class CartPoleSwingUpEnv(gym.Env):
         self.state = state
         state = self.state
         # Valid action
+        action = torch.clamp(action, self.action_space.low[0], self.action_space.high[0])
+
         self.state = next_state = self._transition_fn(self.state, action)
         reward = self._reward_fn(state, action, next_state)
         done = self._terminal(next_state)
