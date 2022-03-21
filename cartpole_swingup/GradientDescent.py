@@ -9,7 +9,7 @@ import modified_gym_cartpole_swingup
 # CartPoleSwingUp-v0, CartPoleSwingUp-v1
 # If you have PyTorch installed:
 # TorchCartPoleSwingUp-v0, TorchCartPoleSwingUp-v1
-env = gym.make("TorchCartPoleSwingUp-v0")
+env = gym.make("CartPoleSwingUp-v0")
 env.reset()
 mpc_env = gym.make("ModifiedTorchCartPoleSwingUp-v0")
 
@@ -18,7 +18,7 @@ actions = []
 done = False
 
 def reset_environment(env, state):
-    env.reset()
+    env.mpc_reset(1, state)
     env.state = state
 
 for i in range(T):
