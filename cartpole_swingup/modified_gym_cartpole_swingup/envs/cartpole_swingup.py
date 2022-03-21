@@ -15,33 +15,33 @@ from gym.utils import seeding
 class CartParams:
     """Parameters defining the Cart."""
 
-    width: float = 1 / 3
-    height: float = 1 / 6
-    mass: float = 0.5
+    width = torch.tensor(1 / 3, device=torch.device('cuda:0'))
+    height = torch.tensor(1 / 6, device=torch.device('cuda:0'))
+    mass = torch.tensor(0.5, device=torch.device('cuda:0'))
 
 
 @dataclass(frozen=True)
 class PoleParams:
     """Parameters defining the Pole."""
 
-    width: float = 0.05
-    length: float = 0.6
-    mass: float = 0.5
+    width = torch.tensor(0.05, device=torch.device('cuda:0'))
+    length = torch.tensor(0.6, device=torch.device('cuda:0'))
+    mass = torch.tensor(0.5, device=torch.device('cuda:0'))
 
 
 @dataclass
 class CartPoleSwingUpParams:  # pylint: disable=no-member,too-many-instance-attributes
     """Parameters for physics simulation."""
 
-    gravity: float = 9.82
-    forcemag: float = 10.0
-    deltat: float = 0.01
-    friction: float = 0.1
-    x_threshold: float = 2.4
-    cart: CartParams = field(default_factory=CartParams)
-    pole: PoleParams = field(default_factory=PoleParams)
-    masstotal: float = field(init=False)
-    mpl: float = field(init=False)
+    gravity = torch.tensor(9.82, device=torch.device('cuda:0'))
+    forcemag = torch.tensor(10.0, device=torch.device('cuda:0'))
+    deltat = torch.tensor(0.01, device=torch.device('cuda:0'))
+    friction = torch.tensor(0.1, device=torch.device('cuda:0'))
+    x_threshold = torch.tensor(2.4, device=torch.device('cuda:0'))
+    cart: CartParams = CartParams
+    pole: PoleParams = PoleParams
+    masstotal = cart.mass + pole.mass
+    mpl = pole.mass * pole.length
 
     def __post_init__(self):
         self.masstotal = self.cart.mass + self.pole.mass
@@ -89,8 +89,13 @@ class CartPoleSwingUpEnv(gym.Env):
 
         return next_state, reward, done, {}
 
-    def reset(self):
-        pass
+    def mpc_reset(self, n=1, state=None):
+        if state is None:
+            self.state = torch.normal(torch.tensor([0.0, 0.0, torch.pi, 0.0], device=torch.device('cuda:0')).repeat(n, 1),
+                                      torch.tensor(0.2, device=torch.device('cuda:0')).repeat(n, 4))
+        else:
+            self.state = state
+        return self.state
 
     @staticmethod
     def _reward_fn(state, action, next_state):  # pylint: disable=unused-argument
@@ -132,7 +137,9 @@ class CartPoleSwingUpEnv(gym.Env):
     @staticmethod
     def _get_obs(state):
         x_pos, x_dot, theta, theta_dot = state
-        return state
+        return np.array(
+            [x_pos, x_dot, np.cos(theta), np.sin(theta), theta_dot], dtype=np.float32
+        )
 
     def render(self, mode="human"):
         if self.viewer is None:
@@ -277,12 +284,12 @@ class CartPoleSwingUpViewer:
         screen = self.screen
         scale = screen.width / self.world_width
 
-        cartx = state[0].detach().numpy() * scale + screen.width / 2.0  # MIDDLE OF CART
+        cartx = state[0, 0].detach().cpu().numpy() * scale + screen.width / 2.0  # MIDDLE OF CART
         carty = screen.height / 2
         self.transforms["cart"].set_translation(cartx, carty)
-        self.transforms["pole"].set_rotation(state[2].detach().numpy())
+        self.transforms["pole"].set_rotation(state[0, 2].detach().cpu().numpy())
         self.transforms["pole_bob"].set_translation(
-            -pole.length * np.sin(state[2].detach().numpy()), pole.length * np.cos(state[2].detach().numpy())
+            -pole.length * np.sin(state[0, 2].detach().cpu().numpy()), pole.length * np.cos(state[0, 2].detach().cpu().numpy())
         )
 
     def render(self, *args, **kwargs):
