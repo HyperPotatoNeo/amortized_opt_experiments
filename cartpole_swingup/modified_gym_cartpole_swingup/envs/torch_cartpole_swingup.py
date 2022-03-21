@@ -13,19 +13,17 @@ class TorchCartPoleSwingUpEnv(CartPoleSwingUpEnv):
     # pylint:disable=too-few-public-methods
 
     def _transition_fn(self, state, action):
-        expanded_next_state, _ = self.transition_fn(self.expand_state(state), action)
-        next_state = self.shrink_state(expanded_next_state)
+        next_state = self.transition_fn(state, action)
         return next_state
 
     def _reward_fn(self, state, action, next_state):
         reward = self.reward_fn(
-            self.expand_state(state), action, self.expand_state(next_state)
+            state, action, next_state
         )
         return reward
 
     def _terminal(self, state):
-        state = torch.as_tensor(state)
-        return self.terminal(state).item()
+        return self.terminal(state)
 
     def terminal(self, state):
         """Return a batched tensor indicating which states are terminal."""
@@ -50,7 +48,7 @@ class TorchCartPoleSwingUpEnv(CartPoleSwingUpEnv):
     def shrink_state(state):
         """Return state with sin and cos combined into theta."""
         return torch.cat(
-            [state[..., :2], torch.atan2(state[3:4], state[..., 2:3]), state[..., 4:]],
+            [state[..., :2], torch.atan2(state[..., 3:4], state[..., 2:3]), state[..., 4:]],
             dim=-1,
         )
 
@@ -67,9 +65,10 @@ class TorchCartPoleSwingUpEnv(CartPoleSwingUpEnv):
 
         delta_t = self.params.deltat
         new_x = state[..., 0] + state[..., 1] * delta_t
+        new_theta = state[..., 2] + state[..., 3] * delta_t
         new_xdot = state[..., 1] + xdot_update * delta_t
-        new_costheta, new_sintheta = self._calculate_theta_update(state, delta_t)
-        new_thetadot = state[..., 4] + thetadot_update * delta_t
+        # new_costheta, new_sintheta = self._calculate_theta_update(state, delta_t)
+        new_thetadot = state[..., 3] + thetadot_update * delta_t
 
         scale = 0.0
         error_x = np.random.rand() * scale
@@ -78,16 +77,16 @@ class TorchCartPoleSwingUpEnv(CartPoleSwingUpEnv):
         error_sintheta = np.random.rand() * scale
         error_thetadot = np.random.rand() * scale
         next_state = torch.stack(
-            [new_x + error_x, new_xdot + error_xdot, new_costheta + error_costheta, new_sintheta + error_sintheta, new_thetadot + error_thetadot], dim=-1
+            [new_x, new_xdot, new_theta, new_thetadot], dim=-1
         )
-        return next_state.expand(torch.Size(sample_shape) + state.shape), None
+        return next_state
 
     def _calculate_xdot_update(self, state, action):
         # pylint: disable=no-member
         x_dot = state[..., 1]
-        theta_dot = state[..., 4]
-        cos_theta = state[..., 2]
-        sin_theta = state[..., 3]
+        theta_dot = state[..., 3]
+        cos_theta = state[..., 2].cos()
+        sin_theta = state[..., 2].sin()
         return (
             -2 * self.params.mpl * (theta_dot ** 2) * sin_theta
             + 3 * self.params.pole.mass * self.params.gravity * sin_theta * cos_theta
@@ -98,9 +97,9 @@ class TorchCartPoleSwingUpEnv(CartPoleSwingUpEnv):
     def _calculate_thetadot_update(self, state, action):
         # pylint: disable=no-member
         x_dot = state[..., 1]
-        theta_dot = state[..., 4]
-        cos_theta = state[..., 2]
-        sin_theta = state[..., 3]
+        theta_dot = state[..., 3]
+        cos_theta = state[..., 2].cos()
+        sin_theta = state[..., 2].sin()
         return (
             -3 * self.params.mpl * (theta_dot ** 2) * sin_theta * cos_theta
             + 6 * self.params.masstotal * self.params.gravity * sin_theta
@@ -130,11 +129,11 @@ class TorchCartPoleSwingUpV0(TorchCartPoleSwingUpEnv):
     # pylint:disable=missing-docstring
     @staticmethod
     def reward_fn(state, action, next_state):  # pylint: disable=unused-argument
-        return next_state[..., 2] - abs(next_state[..., 0])
+        return next_state[..., 2].cos() - abs(next_state[..., 0])
 
 
 class TorchCartPoleSwingUpV1(TorchCartPoleSwingUpEnv):
     # pylint:disable=missing-docstring
     @staticmethod
     def reward_fn(state, action, next_state):  # pylint: disable=unused-argument
-        return (1 + next_state[..., 2]) / 2
+        return (1 + next_state[..., 2].cos()) / 2
