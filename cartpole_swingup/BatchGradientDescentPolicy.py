@@ -27,12 +27,11 @@ class BatchGradientDescentPolicy:
             for t in range(self.T):
                 self.mpc_env.state, reward, done, _ = self.mpc_env.mpc_step(self.mpc_env.state, self.actions[:, t])
                 rewards -= reward
-
             rewards = torch.sum(rewards)
-            rewards.backward(retain_graph=True)
+            rewards.backward()
             optimizer.step()
 
-        return self.actions[:, 0]
+        return self.actions
 
 
 if __name__ == "__main__":
