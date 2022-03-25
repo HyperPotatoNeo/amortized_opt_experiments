@@ -71,18 +71,18 @@ class LSTM_direct_policy:
 
     def __call__(self, state, batch_size=512):
         #state = torch.tensor(state).float().cuda()
-        self.env.state = state
+        self.env.mpc_reset(state=state)
+
         actions = torch.zeros((self.N,self.T)).float().cuda()
         total_reward = 0
         for t in range(self.T):
-            #state = self.env.state
             if(t==0):
                 action_t = self.model(self.env.state, begin_sequence=True, batch_size=batch_size)
             else:
                 #state = torch.zeros(state.shape).float().cuda()
                 action_t = self.model(self.env.state)
-            #self.env.mpc_step(state, action_t)
-            self.env.state, reward, done, _ = self.env.mpc_step(self.env.state, action_t)
+            #self.env.step(action_t)
+            obs, reward, done, _ = self.env.step(action_t)
             total_reward = total_reward-reward
             actions[:,t] = actions[:,t]+torch.squeeze(action_t, dim=1)
 

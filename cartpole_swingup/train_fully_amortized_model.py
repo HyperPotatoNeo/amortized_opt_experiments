@@ -6,10 +6,6 @@ import fully_amortized_model
 import gym_cartpole_swingup
 import os
 
-def reset_environment(env, state):
-    env.reset()
-    env.state = state
-
 
 def collect_data(policy, env, state_dim=4, obs_dim=5, eps=150, eps_len=200, filename='data', dagger_iter=0):
     print('DAGGER ITER: ',dagger_iter)
@@ -93,10 +89,10 @@ for i in range(n_dagger):
 
                 for ep in range(batch_size):
                     cur_state = data[k*batch_size+ep,:state_dim]
-                    reset_environment(mpc_env, torch.as_tensor(env.state))
+                    mpc_env.mpc_reset(torch.as_tensor(env.state))
                     ep_cost = 0.0
                     for t in range(T):
-                        mpc_env.state, reward, done, _ = mpc_env.mpc_step(mpc_env.state, torch.unsqueeze(actions[ep,t],0))
+                        obs, reward, done, _ = mpc_env.step(torch.unsqueeze(actions[ep, t], 0))
                         ep_cost = ep_cost - reward
                     total_cost = total_cost + ep_cost
                 
