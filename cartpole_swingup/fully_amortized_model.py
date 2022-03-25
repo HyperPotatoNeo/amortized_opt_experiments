@@ -23,7 +23,7 @@ class MLP_direct_policy_model(torch.nn.Module):
 class LSTM_direct_policy_model(torch.nn.Module):
     def __init__(self, state_dim=4, action_dim=1, hidden_size=128, num_layers=1):
         super(LSTM_direct_policy_model, self).__init__()
-
+        self.num_layers = num_layers
         self.lstm = torch.nn.LSTM(input_size=state_dim, hidden_size=hidden_size, num_layers=num_layers)
         self.linear1 = torch.nn.Linear(hidden_size,action_dim)
         self.linear3 = torch.nn.Linear(hidden_size, hidden_size)
@@ -38,7 +38,9 @@ class LSTM_direct_policy_model(torch.nn.Module):
         x = torch.unsqueeze(x, dim=0)
 
         if(begin_sequence):
-            x, (self.hn, self.cn) = self.lstm(x, (torch.zeros((1,batch_size,self.hidden_size)).float().cuda(),torch.zeros((1,batch_size,self.hidden_size)).float().cuda()))
+            x, (self.hn, self.cn) = self.lstm(x,
+                                              (torch.zeros((self.num_layers, batch_size, self.hidden_size)).float().cuda(),
+                                               torch.zeros((self.num_layers, batch_size, self.hidden_size)).float().cuda()))
         else:
             x, (self.hn, self.cn) = self.lstm(x, (self.hn, self.cn))
         h_out = self.hn[-1]
