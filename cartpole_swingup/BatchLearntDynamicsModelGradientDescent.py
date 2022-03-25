@@ -2,13 +2,14 @@ import gym
 import modified_gym_cartpole_swingup
 import numpy as np
 import torch
+torch.set_printoptions(sci_mode=False)
 
 from dynamics_model import MLP_Dynamics
 
 
 class BatchLearntModelGradientDescentPolicy:
 
-    def __init__(self, learnt_model, x_mean, x_std, y_mean, y_std, env, T=70, iters=20, lr=0.01, N=1):
+    def __init__(self, learnt_model, x_mean, x_std, y_mean, y_std, T=70, iters=20, lr=0.01, N=1):
         if isinstance(learnt_model, str):
             self.dynamics_model = MLP_Dynamics()
             self.dynamics_model.load_state_dict(torch.load(learnt_model).state_dict())
@@ -20,17 +21,18 @@ class BatchLearntModelGradientDescentPolicy:
         self.x_std = x_std
         self.y_mean = y_mean
         self.y_std = y_std
-        self.env = env
         self.T = T
         self.iters = iters
         self.lr = lr
         self.N = N
         self.actions = torch.tensor(data=torch.FloatTensor(self.N, self.T).uniform_(-1.0, 1.0), device=torch.device('cuda:0'), requires_grad=True)
 
-    def __call__(self, state=None):
-        if state is None:
-            state = self.env.state
-        self.actions = torch.nn.Parameter(data=torch.hstack((self.actions[:, 1:], torch.zeros((self.N, 1), device=torch.device('cuda:0')))), requires_grad=True)
+    def __call__(self, state, warm_start=False):
+        if warm_start:
+            self.actions = torch.nn.Parameter(data=torch.hstack((self.actions[:, 1:], torch.zeros((self.N, 1), device=torch.device('cuda:0')))), requires_grad=True)
+        else:
+            self.actions = torch.tensor(data=torch.FloatTensor(self.N, self.T).uniform_(-1.0, 1.0),
+                                        device=torch.device('cuda:0'), requires_grad=True)
 
         optimizer = torch.optim.Adam({self.actions}, lr=self.lr)
 
@@ -43,10 +45,10 @@ class BatchLearntModelGradientDescentPolicy:
                 reward = current_state[:, 2].cos() - abs(current_state[:, 0])
                 rewards = rewards - reward
             rewards = torch.sum(rewards)
-            rewards.backward(retain_graph=True)
+            rewards.backward()
             optimizer.step()
 
-        return self.actions[:, 0]
+        return self.actions
 
 
 if __name__ == "__main__":
@@ -69,9 +71,9 @@ if __name__ == "__main__":
 
     done = False
 
-    policy = BatchLearntModelGradientDescentPolicy(model, x_mean, x_std, y_mean, y_std, env, N=N)
+    policy = BatchLearntModelGradientDescentPolicy(model, x_mean, x_std, y_mean, y_std, N=N)
 
     for i in range(500):
-        env.mpc_step(env.state, policy())
+        env.step(policy(env.state.detach(), warm_start=True))
         if i % 5 == 0:
             env.render()

@@ -17,10 +17,6 @@ T = 70
 actions = []
 done = False
 
-def reset_environment(env, state):
-    env.mpc_reset(1, state)
-    env.state = state
-
 for i in range(T):
     actions.append(torch.tensor(env.action_space.sample(), requires_grad=True))
 
@@ -31,12 +27,12 @@ while not done:
 
     for i in range(10):
         optimizer.zero_grad()
-        reset_environment(mpc_env, torch.as_tensor(env.state))
+        mpc_env.mpc_reset(1, torch.as_tensor(env.state))
         rewards = 0
         for t in range(T):
-            mpc_env.state, reward, done, _ = mpc_env.mpc_step(mpc_env.state, actions[t])
+            obs, reward, done, _ = mpc_env.step(actions[t])
             rewards -= reward
-        rewards.backward(retain_graph=True)
+        rewards.backward()
         optimizer.step()
     obs, rew, done, info = env.step(actions[0].detach().numpy())
     env.render()

@@ -77,8 +77,7 @@ class CartPoleSwingUpEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def mpc_step(self, state, action):
-        self.state = state
+    def step(self, action):
         state = self.state
         # Valid action
         action = torch.clamp(action, self.action_space.low[0], self.action_space.high[0])
@@ -87,7 +86,10 @@ class CartPoleSwingUpEnv(gym.Env):
         reward = self._reward_fn(state, action, next_state)
         done = self._terminal(next_state)
 
-        return next_state, reward, done, {}
+        return self._get_obs(next_state), reward, done, {}
+
+    def reset(self):
+        return self.mpc_reset(n=1)
 
     def mpc_reset(self, n=1, state=None):
         if state is None:
@@ -95,7 +97,7 @@ class CartPoleSwingUpEnv(gym.Env):
                                       torch.tensor(0.2, device=torch.device('cuda:0')).repeat(n, 4))
         else:
             self.state = state
-        return self.state
+        return self._get_obs(self.state)
 
     @staticmethod
     def _reward_fn(state, action, next_state):  # pylint: disable=unused-argument
@@ -136,10 +138,11 @@ class CartPoleSwingUpEnv(gym.Env):
 
     @staticmethod
     def _get_obs(state):
-        x_pos, x_dot, theta, theta_dot = state
-        return np.array(
-            [x_pos, x_dot, np.cos(theta), np.sin(theta), theta_dot], dtype=np.float32
-        )
+        return torch.hstack((state[..., 0].unsqueeze(dim=1),
+                             state[..., 1].unsqueeze(dim=1),
+                             state[..., 2].cos().unsqueeze(dim=1),
+                             state[..., 2].sin().unsqueeze(dim=1),
+                             state[..., 3].unsqueeze(dim=1)))
 
     def render(self, mode="human"):
         if self.viewer is None:

@@ -21,7 +21,6 @@ if importlib.util.find_spec("torch"):
         id="ModifiedTorchCartPoleSwingUp-v0",
         entry_point="modified_gym_cartpole_swingup.envs.torch_cartpole_swingup:"
         "TorchCartPoleSwingUpV0",
-        max_episode_steps=500,
     )
 
     register(
