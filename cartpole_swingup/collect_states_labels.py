@@ -6,25 +6,18 @@ import os
 
 def collect_states(policy, env, state_dim=4, obs_dim=5, eps=30, eps_len=200, filename='data', dagger_iter=0):
     print('COLLECTING DAGGER STATES: ',dagger_iter)
-    data = np.zeros((eps*eps_len,state_dim+obs_dim))
-    rows = 0
+    data = np.empty((0, state_dim + obs_dim))
 
-    for i in range(eps):
-        print('Episode: ',i)
-        obs = env.reset()
-        for j in range(eps_len):
-            data[rows,:state_dim] = env.state
-            data[rows,state_dim:] = obs
-            rows += 1
-            state = torch.unsqueeze(torch.tensor(env.state), dim=0).float().cuda()
-            actions,_ = policy(state, batch_size=1)
-            action = actions[0,0].detach().cpu().numpy()
-            obs, rewards, done, info = env.step(action)
-            if(done==True):
-                break
-            if(i%30==0):
-                env.render()
-    data = data[:rows,:]
+    obs = env.mpc_reset(n=eps)
+    data = np.vstack((data, np.hstack((env.state.cpu().numpy(), obs.cpu().numpy()))))
+
+    for j in range(eps_len):
+        state = torch.tensor(env.state).float().cuda()
+        actions, _ = policy(state, batch_size=eps)
+        obs, _, done, _ = env.step(actions)
+        data = np.vstack((data, np.hstack((env.state[~done].cpu().numpy(), obs[~done].cpu().numpy()))))
+        # env.render()
+
     filename = filename+'_'+str(dagger_iter)
 
     np.save('dagger_data/'+filename+'.npy', data)

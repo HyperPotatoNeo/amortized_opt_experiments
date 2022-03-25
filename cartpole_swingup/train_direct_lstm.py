@@ -7,7 +7,7 @@ import collect_states_labels
 import BatchGradientDescentPolicy
 import gym
 
-env = gym.make("TorchCartPoleSwingUp-v0")
+env = gym.make("ModifiedTorchCartPoleSwingUp-v0")
 mpc_env = gym.make("ModifiedTorchCartPoleSwingUp-v0")
 
 T = 40
@@ -29,7 +29,7 @@ batch_size = 512
 GD_policy = BatchGradientDescentPolicy.BatchGradientDescentPolicy(T=T, iters=600, N=2048)
 
 
-epochs = 1300
+epochs = 151
 prev_file = None
 
 LSTM_policy = fully_amortized_model.LSTM_direct_policy(mpc_env, state_dim=4, action_dim=1, T=T, hidden_size=64, num_layers=1, model=None, N=batch_size)
@@ -41,14 +41,14 @@ for i in range(n_dagger):
     states_labels_file = filename
     
     if(COLLECT_DATA):
-        LSTM_policy.N = 1
+        LSTM_policy.N = 20 + i * 3
         with torch.no_grad():
-            data_file = collect_states_labels.collect_states(LSTM_policy, env, state_dim=4, obs_dim=5, eps=40+i*3, eps_len=400+i*10, filename=states_file, dagger_iter=i)
+            data_file = collect_states_labels.collect_states(LSTM_policy, env, state_dim=4, obs_dim=5, eps=20+i*3,
+                                                             eps_len=400+i*10, filename=states_file, dagger_iter=i)
         #data_file = 'dagger_data/lstm_dagger_0'
         output_file = data_file+'_'+'labels'
         collect_states_labels.label_states(GD_policy, data_file, output_file, batch_size=2048, state_dim=4, obs_dim=5, action_dim=1, T=T, prev_file=prev_file)
         prev_file = output_file
-    LSTM_policy.N = batch_size
 
     LSTM_policy = fully_amortized_model.LSTM_direct_policy(mpc_env, state_dim=4, action_dim=1, T=T, hidden_size=64, num_layers=1, model=None, N=batch_size)
     optimizer = torch.optim.Adam(LSTM_policy.model.parameters(), lr=0.00005)
@@ -69,6 +69,7 @@ for i in range(n_dagger):
             #mean_reward.backward()
             action_labels = data[k*batch_size:k*batch_size+batch_size, state_dim+obs_dim:state_dim+obs_dim+T]
             action_labels = torch.tensor(action_labels).float().cuda()
+            action_labels = torch.clamp(action_labels, -1.0, 1.0)
             loss = criterion(torch.flatten(actions), torch.flatten(action_labels))
             loss.backward()
             optimizer.step()
@@ -76,7 +77,7 @@ for i in range(n_dagger):
             #print(k,'/',data.shape[0]//batch_size,' COST = ',loss.detach().cpu().numpy())
         print('EPOCH LOSS = ',total_loss)
         
-        if(j%600==0 and not j==0):
+        if j % 50 == 0 and not j == 0:
             optimizer.param_groups[0]['lr'] /= 10.0
 
-    #torch.save(LSTM_policy.model, 'fully_amortized_models/LSTM_Dagger_'+str(i))
+    torch.save(LSTM_policy.model, 'fully_amortized_models/LSTM_Dagger_' + str(i))
