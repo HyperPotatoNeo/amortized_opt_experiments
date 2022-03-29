@@ -35,6 +35,8 @@ class BatchGradientDescentPolicy:
             rewards = torch.sum(rewards)
             rewards.backward()
             optimizer.step()
+            with torch.no_grad():
+                self.actions.data = torch.clamp(self.actions, -1.0, 1.0)
 
         return self.actions
 
