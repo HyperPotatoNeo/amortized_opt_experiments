@@ -16,6 +16,7 @@ class BatchCollocationPolicy:
         self.N = N
         self.rho = 200
         self.mpc_env = gym.make("ModifiedTorchCartPoleSwingUp-v0")
+        self.mpc_env.reset()
         self.mpc_env.mpc_reset(self.N * self.T)
         self.states = torch.tensor(data=torch.zeros(self.N * (self.T + 1), 4).float(),
                                    device=torch.device('cuda:0'),
@@ -86,6 +87,7 @@ if __name__ == "__main__":
     env = gym.make('ModifiedTorchCartPoleSwingUp-v0')
     N = 1
     T = 70
+    env.reset()
     env.mpc_reset(N)
 
     done = False
