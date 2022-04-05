@@ -1,4 +1,6 @@
+*.csv
 *.npy
 *.zip
 MLP_Dagger_*
+feasibility_model
 __pycache__/
