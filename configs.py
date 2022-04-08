@@ -9,6 +9,13 @@ def observation_dim(env: str):
         raise NotImplementedError
 
 
+def goal_dim(env: str):
+    if 'Fetch' in env:
+        return 3
+    else:
+        raise NotImplementedError
+
+
 def action_dim(env: str):
     if 'CartPole' in env:
         return 1
