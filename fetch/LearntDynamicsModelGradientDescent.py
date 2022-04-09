@@ -60,6 +60,7 @@ class LearntModelGradientDescentPolicy:
                     reward = - ((current_state[0] - goal[0]) ** 2 + (current_state[1] - goal[1]) ** 2 + (current_state[2] - goal[2]) ** 2)
                 else:
                     reward = - ((current_state[3] - goal[0]) ** 2 + (current_state[4] - goal[1]) ** 2)
+                    reward += - (current_state[6] ** 2 + current_state[7] ** 2)
                     # reward = - ((current_state[3] - current_state[0]) ** 2 + (current_state[4] - current_state[1]) ** 2 + (current_state[5] - current_state[2]) ** 2)
                     # reward = - ((current_state[0] - goal[0]) ** 2 + (current_state[1] - goal[1]) ** 2 + (current_state[2] - goal[2]) ** 2)
                 rewards -= reward
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument('--epochs', type=int, default=30000, help='Number of epochs for training')
     parser.add_argument('--decay-after', type=int, default=10000, help='Decay learning rate after')
     parser.add_argument('--decay-factor', type=float, default=10.0, help='Learning rate decay factor')
-    parser.add_argument('--learning-rate', type=float, default=0.01, help='Learning rate')
+    parser.add_argument('--learning-rate', type=float, default=0.05, help='Learning rate')
     parser.add_argument('--num-steps', type=int, default=0, help='Number of steps after which to learn dynamics')
 
     args = parser.parse_args()
@@ -145,5 +146,20 @@ if __name__ == "__main__":
                     np.save(args.filename, learn_dynamics.data)
                     policy.model = learn_dynamics.learn_dynamics(new_model=True)
                     index = 0
+
+                    temp_data = learn_dynamics.data
+                    train_x = temp_data[:, :obs['observation'].shape[0] + env.action_space.shape[0]]
+                    train_y = temp_data[:, obs['observation'].shape[0] + env.action_space.shape[0]:]
+
+                    x_mean = torch.tensor(train_x.mean(axis=0), device=torch.device('cuda:0'))
+                    x_std = torch.tensor(train_x.std(axis=0), device=torch.device('cuda:0'))
+                    ltrain_y = train_y - train_x[:, :obs['observation'].shape[0]]
+                    y_mean = torch.tensor(ltrain_y.mean(axis=0), device=torch.device('cuda:0'))
+                    y_std = torch.tensor(ltrain_y.std(axis=0), device=torch.device('cuda:0'))
+
+                    policy.x_mean = x_mean
+                    policy.x_std = x_std
+                    policy.y_mean = y_mean
+                    policy.y_std = y_std
 
             env.render()
