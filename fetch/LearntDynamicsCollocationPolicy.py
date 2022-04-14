@@ -29,7 +29,7 @@ class LearntDynamicsCollocationPolicy:
         self.lr = lr
         self.observation_dim = observation_dim
         self.action_dim = action_dim
-        self.rho = 200
+        self.rho = 0
         self.epsilon = 1e-6
         self.states = torch.tensor(data=torch.FloatTensor(self.T + 1, self.observation_dim).uniform_(-1.0, 1.0),
                                    device=torch.device('cuda:0'),
@@ -50,15 +50,15 @@ class LearntDynamicsCollocationPolicy:
         if warm_start:
             self.actions.data[:-skip, :] = self.actions.clone().data[skip:, :]
 
-            self.states.data *= 0.0
+            # self.states.data *= 0.0
+            # self.states.data[:, :3] = torch.tensor(observation['achieved_goal'], device='cuda:0')
+            # self.states.data[:, 3:6] = self.states.data[:, :3]
             self.states.data[0] = obs
-            self.states.data[:, :3] = torch.tensor(observation['achieved_goal'], device='cuda:0')
-            self.states.data[:, 3:6] = self.states.data[:, :3]
-            # for t in range(self.T):
-            #     self.states.data[t + 1] = self.states[t] + self.dynamics_model.networks[0]((self.states[t] - self.x_mean) / self.x_std, self.actions[t]) * self.y_std + self.y_mean
+            for t in range(self.T):
+                self.states.data[t + 1] = self.states[t] + self.dynamics_model.networks[0]((self.states[t] - self.x_mean) / self.x_std, self.actions[t]) * self.y_std + self.y_mean
 
             # self.states.data[:-skip, :] = self.states.clone().data[skip:, :]
-            self.lambdas = torch.tensor(data=torch.ones(self.T).float() * 500,
+            self.lambdas = torch.tensor(data=torch.ones(self.T).float() * 5,
                                         device=torch.device('cuda:0'))
         else:
             self.states.data *= 0.0
@@ -68,10 +68,17 @@ class LearntDynamicsCollocationPolicy:
             self.lambdas = torch.tensor(data=torch.ones(self.T).float() * 500,
                                         device=torch.device('cuda:0'))
 
-        state_optimizer = torch.optim.Adam({self.states}, lr=0.0005)
         action_optimizer = torch.optim.Adam({self.actions}, lr=0.05)
-        for i in range(self.iters):
-            for j in range(1500):
+
+        i = 0
+        while i < 50 and (i < self.iters or ~((torch.sum((self.states[1:6] - next_states[:5]) ** 2, dim=1) < self.epsilon).all())):
+            i += 1
+            state_optimizer = torch.optim.Adam({self.states}, lr=0.005)
+
+            for j in range(3000):
+                if j != 0 and j % 1000 == 0:
+                    state_optimizer.param_groups[0]['lr'] /= 10.0
+
                 state_optimizer.zero_grad()
                 action_optimizer.zero_grad()
                 self.states.data[0] = obs
@@ -83,7 +90,7 @@ class LearntDynamicsCollocationPolicy:
                 else:
                     rewards += ((self.states[self.final_indices, 3] - goal[0]) ** 2 + (self.states[self.final_indices, 4] - goal[1]) ** 2)
                     # rewards += ((self.states[self.final_indices, 3] - self.states[self.final_indices, 0]) ** 2 + (self.states[self.final_indices, 4] - self.states[self.final_indices, 1]) ** 2)
-                    # rewards += (self.states[self.final_indices, 6] ** 2 + self.states[self.final_indices, 7] ** 2)
+                    rewards += (self.states[self.final_indices, 6] ** 2 + self.states[self.final_indices, 7] ** 2)
                     # rewards += ((next_states[:, 0] - goal[0]) ** 2 + (next_states[:, 1] - goal[1]) ** 2 + (next_states[:, 2] - goal[2]) ** 2)
                     # print(torch.sum(rewards))
                 rewards += self.lambdas * (torch.sum((self.states[self.final_indices] - next_states) ** 2, dim=1) - self.epsilon)
@@ -113,7 +120,7 @@ class LearntDynamicsCollocationPolicy:
             # next_states = self.states[self.initial_indices] + (self.dynamics_model(((torch.hstack([self.states[self.initial_indices], self.actions]) - self.x_mean) / self.x_std).float()) * self.y_std) + self.y_mean
             next_states = self.states[self.initial_indices] + self.dynamics_model.networks[0]((self.states[self.initial_indices] - self.x_mean) / self.x_std, self.actions) * self.y_std + self.y_mean
             print('constraint', torch.hstack(((torch.sum((self.states[self.final_indices] - next_states) ** 2, dim=1).reshape(-1, 1) < self.epsilon), self.lambdas.reshape(-1, 1))))
-            self.lambdas.data += 0.1 * torch.log(torch.sum((self.states[self.final_indices] - next_states) ** 2, dim=1) / self.epsilon + 0.01) * self.lambdas
+            self.lambdas.data += 0.05 * torch.log(torch.sum((self.states[self.final_indices] - next_states) ** 2, dim=1) / self.epsilon + 0.01) * self.lambdas
             self.lambdas.data = torch.clamp(self.lambdas, 0.0, 500000000000.0)
 
         return self.states, self.actions.detach().cpu().numpy()
@@ -173,7 +180,7 @@ if __name__ == "__main__":
 
     policy = LearntDynamicsCollocationPolicy(model, x_mean, x_std, y_mean, y_std, observation_dim=obs['observation'].shape[0], action_dim=env.action_space.shape[0], iters=30, T=20)
 
-    skip = 5
+    skip = 1
     for _ in range(500):
         obs = env.reset()
         env.render()
