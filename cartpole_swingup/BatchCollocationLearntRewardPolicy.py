@@ -8,7 +8,10 @@ torch.set_printoptions(sci_mode=False)
 
 class BatchCollocationLearntRewardPolicy:
 
-    def __init__(self,  T=70, iters=10, lr=0.01, N=1):
+    def __init__(self, rewards_model, x_mean, x_std, T=70, iters=10, lr=0.01, N=1):
+        self.rewards_model = rewards_model
+        self.x_mean = x_mean
+        self.x_std = x_std
         self.T = T
         self.iters = iters
         self.lr = lr
@@ -30,11 +33,6 @@ class BatchCollocationLearntRewardPolicy:
         indices = torch.arange(self.N * (self.T + 1))
         self.initial_indices = indices.reshape(self.N, self.T + 1)[:, :-1].reshape(self.N * self.T)
         self.final_indices = indices.reshape(self.N, self.T + 1)[:, 1:].reshape(self.N * self.T)
-
-        self.rewards_model = torch.load('rewards_models/rm_1.zip').cuda()
-        data = np.load('dynamics_data/data_T_15_dagger.npy')[:, :4]
-        self.x_mean = torch.tensor(data.mean(axis=0), device='cuda:0')
-        self.x_std = torch.tensor(data.std(axis=0), device='cuda:0')
 
     def __call__(self, state, warm_start=False, skip=1):
         if warm_start:
@@ -81,9 +79,6 @@ class BatchCollocationLearntRewardPolicy:
                 with torch.no_grad():
                     self.actions.data = torch.clamp(self.actions, -1.0, 1.0)
 
-            print(self.states)
-            print((self.actions))
-
             self.states.data[::self.T + 1] = state
             self.mpc_env.mpc_reset(state=self.states[self.initial_indices])
             self.mpc_env.step(self.actions.reshape(self.N * self.T, 1))
@@ -100,9 +95,17 @@ if __name__ == "__main__":
     env.reset()
     env.mpc_reset(N)
 
+    data = np.load('dynamics_data/data_T_15_dagger.npy')
+    train_x = data[:, :4]
+
+    x_mean = torch.tensor(train_x.mean(axis=0), device=torch.device('cuda:0'))
+    x_std = torch.tensor(train_x.std(axis=0), device=torch.device('cuda:0'))
+
+    rewards_model = torch.load('rewards_models/rm_1.zip')
+
     done = False
 
-    policy = BatchCollocationLearntRewardPolicy(T=T, iters=30, N=N)
+    policy = BatchCollocationLearntRewardPolicy(rewards_model, x_mean, x_std, T=T, iters=30, N=N)
 
     for i in range(500):
         states, actions = policy(env.state.detach(), warm_start=True, skip=10)
