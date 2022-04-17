@@ -114,7 +114,7 @@ class BatchCollocationSecondOrderPolicy:
             self.states.data[::self.T + 1] = state
             self.mpc_env.mpc_reset(state=self.states[self.initial_indices])
             self.mpc_env.step(self.actions.reshape(self.N * self.T, 1))
-            self.lambdas.data += 0.01 * torch.log(torch.sum((self.states[self.final_indices] - self.mpc_env.state) ** 2, dim=1) / (1e-6) + 0.01) * self.lambdas
+            self.lambdas.data += 0.05 * torch.log(torch.sum((self.states[self.final_indices] - self.mpc_env.state) ** 2, dim=1) / (5e-6) + 0.01) * self.lambdas
             self.lambdas.data = torch.clamp(self.lambdas, 0.0, 500000000.0)
             print(self.states)
             print(self.actions)
