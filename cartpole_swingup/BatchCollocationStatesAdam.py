@@ -18,13 +18,13 @@ class BatchCollocationStatesAdamPolicy:
         self.mpc_env.reset()
         self.mpc_env.mpc_reset(self.N * self.T)
         self.states = torch.tensor(data=torch.zeros(self.N * (self.T + 1), 4).float(),
-                                   device=torch.device('cuda:0'),
+                                   device=torch.device('cpu:0'),
                                    requires_grad=True)
         self.actions = torch.tensor(data=torch.FloatTensor(self.N * self.T).uniform_(-1.0, 1.0),
-                                    device=torch.device('cuda:0'),
+                                    device=torch.device('cpu:0'),
                                     requires_grad=True)
         self.lambdas = torch.tensor(data=torch.ones(self.N * self.T).float(),
-                                    device=torch.device('cuda:0'))
+                                    device=torch.device('cpu:0'))
 
         indices = torch.arange(self.N * (self.T + 1))
         self.initial_indices = indices.reshape(self.N, self.T + 1)[:, :-1].reshape(self.N * self.T)
@@ -41,12 +41,12 @@ class BatchCollocationStatesAdamPolicy:
                 self.states.data[t + 1::self.T + 1] = self.mpc_env.state
 
             self.lambdas = torch.tensor(data=torch.ones(self.N * self.T).float() * 500,
-                                        device=torch.device('cuda:0'))
+                                        device=torch.device('cpu:0'))
         else:
             self.states.data *= 0.0
             self.states.data[::self.T + 1] = state
             self.lambdas = torch.tensor(data=torch.ones(self.N * self.T).float(),
-                                        device=torch.device('cuda:0'))
+                                        device=torch.device('cpu:0'))
 
         for i in range(self.iters):
             state_optimizer = torch.optim.Adam({self.states}, lr=0.1)
@@ -57,7 +57,7 @@ class BatchCollocationStatesAdamPolicy:
                 self.get_actions_from_states(iters=60)
                 self.mpc_env.mpc_reset(state=self.states[self.initial_indices])
                 self.mpc_env.step(self.actions.reshape(self.N * self.T, 1))
-                rewards = torch.tensor(0.0, device=torch.device('cuda:0')).repeat(self.N * self.T)
+                rewards = torch.tensor(0.0, device=torch.device('cpu:0')).repeat(self.N * self.T)
                 rewards -= self.states[self.final_indices, 2].cos() - abs(self.states[self.final_indices, 0])
                 rewards += self.lambdas * (torch.sum((self.states[self.final_indices] - self.mpc_env.state) ** 2, dim=1) - self.epsilon)
                 rewards += 0.5 * self.rho * (torch.sum((self.states[self.final_indices] - self.mpc_env.state) ** 2, dim=1) ** 2)
