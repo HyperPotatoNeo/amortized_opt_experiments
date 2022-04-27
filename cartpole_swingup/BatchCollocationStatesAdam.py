@@ -49,10 +49,10 @@ class BatchCollocationStatesAdamPolicy:
                                         device=torch.device('cpu:0'))
 
         for i in range(self.iters):
-            state_optimizer = torch.optim.Adam({self.states}, lr=0.1)
+            state_optimizer = torch.optim.Adam({self.states}, lr=0.15)
             self.action_optimizer = torch.optim.Adam({self.actions}, lr=0.05)
 
-            for j in range(500):
+            for j in range(400):
                 state_optimizer.zero_grad()
                 self.states.data[::self.T + 1] = state
                 self.mpc_env.mpc_reset(state=self.states[self.initial_indices])
@@ -64,7 +64,7 @@ class BatchCollocationStatesAdamPolicy:
 
                 rewards = torch.sum(rewards)
                 rewards.backward()
-                self.get_actions_from_states(self.states.data, 1)
+                self.get_actions_from_states(self.states.data, 2)
                 state_optimizer.step()
 
                 with torch.no_grad():
