@@ -108,7 +108,7 @@ def draw_path(world, points):
     color = carla.Color(255, 0, 0, 255)
     for w in points:
         t = carla.Location(float(w[0]), float(w[1]), 0.5)
-        world.debug.draw_point(t, size=0.1, color=color, life_time=0.1) 
+        world.debug.draw_point(t, size=0.1, color=color, life_time=0.1)
 
 
 def draw_waypoints(world, waypoints, z=0.5, color=(255,0,0)): # from carla/agents/tools/misc.py
@@ -123,7 +123,7 @@ def draw_waypoints(world, waypoints, z=0.5, color=(255,0,0)): # from carla/agent
     color = carla.Color(r=color[0],g=color[1],b=color[2],a=255)
     for w in waypoints:
         t = w.transform
-        begin = t.location + carla.Location(z)
+        begin = t.location + carla.Location(0, 0, z)
         # angle = math.radians(t.rotation.yaw)
         # end = begin + carla.Location(x=math.cos(angle), y=math.sin(angle))
         world.debug.draw_point(begin, size=0.05, color=color, life_time=0.1)
@@ -253,7 +253,7 @@ class CarEnv:
         self.file_num = 0
         # self.waypoint_chasing_index = 0
 
-    def reset(self): # reset at the beginning of each episode "current_state = env.reset()"
+    def reset(self, parking=False): # reset at the beginning of each episode "current_state = env.reset()"
         # print("call reset. ")
         tqdm.write("call reset")
 
@@ -261,7 +261,10 @@ class CarEnv:
         self.collision_hist = []
         self.actor_list = [] # include the vehicle and the collision sensor # no multiagent at this point
 
-        self.spawn_point = random.choice(self.world.get_map().get_spawn_points()) # everytime set a new spawning point # ??? How about the destination?
+        if parking:
+            self.spawn_point = carla.Transform(carla.Location(x=-29.550086975097656, y=-43.74036407470703, z=0.5))
+        else:
+            self.spawn_point = random.choice(self.world.get_map().get_spawn_points()) # everytime set a new spawning point # ??? How about the destination?
         #self.spawn_point = self.world.get_map().get_spawn_points()[8] # fixed for testing
 
         new_car = False
@@ -289,7 +292,7 @@ class CarEnv:
             # blueprint.set_attribute('fov', '110')
             self.camera = self.world.spawn_actor(
                 blueprint,
-                carla.Transform(carla.Location(x=5, z=20), carla.Rotation(pitch=-90)),
+                carla.Transform(carla.Location(x=5, z=23), carla.Rotation(pitch=-90)),
                 attach_to=self.vehicle)
             self.camera.image_size_x = 1920
             self.actor_list.append(self.camera)
@@ -305,6 +308,18 @@ class CarEnv:
         self.update_waypoint_buffer(given_loc=[True, self.spawn_point.location])
 
         self.time = 0
+        if not parking:
+            iters = 1000
+        else:
+            iters = 300
+
+        for _ in range(iters):
+            self.clock.tick()
+            self.world.tick(1)
+            image_rgb = self.image_queue.get()
+            draw_image(self.display, image_rgb)
+            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0, brake=0.0))
+
         return self.get_state(), self.get_waypoint()
 
     def collision_data(self, event):
@@ -389,7 +404,7 @@ class CarEnv:
 
         return onp.array(waypoints)
 
-    def step(self, action, states): # 0:steer; 1:throttle; 2:brake; onp array shape = (3,)
+    def step(self, action, states, actual_states=None): # 0:steer; 1:throttle; 2:brake; onp array shape = (3,)
         assert len(action) == 3
 
         if self.time >= START_TIME: # starting time
@@ -472,6 +487,8 @@ class CarEnv:
             draw_waypoints(self.world, past_WP, z=0.5, color=(0,255,0))
             draw_waypoints(self.world, [self.waypoint_buffer[self.min_distance_index]], z=0.5, color=(0,0,255))
             draw_path(self.world, states)
+            if actual_states is not None:
+                draw_path(self.world, actual_states)
             # draw_waypoints(self.world, self.waypoint_buffer)
 
         if len(self.collision_hist) != 0:
